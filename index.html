@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPS Precast — Interactive VSM</title>
+<style>
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3350;
+  --accent:#3b82f6;--a2:#f59e0b;--a3:#10b981;--waste:#ef4444;
+  --text:#e2e8f0;--muted:#64748b;--push:#6366f1;--va:#10b981;--nva:#ef4444;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',system-ui,sans-serif;font-size:13px;}
+input,select{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:5px 8px;font-size:12px;font-family:inherit;width:100%;}
+input:focus,select:focus{outline:none;border-color:var(--accent);}
+input[type=number]{-moz-appearance:textfield;}
+button{cursor:pointer;border:none;border-radius:4px;font-family:inherit;font-size:12px;font-weight:600;padding:6px 12px;transition:opacity .15s;}
+button:hover{opacity:.85;}
+label{font-size:11px;color:var(--muted);margin-bottom:3px;display:block;}
+select option{background:var(--surface2);}
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+.tab-btn{padding:7px 15px;border-radius:6px 6px 0 0;cursor:pointer;font-size:12px;font-weight:500;color:var(--muted);background:transparent;border:1px solid transparent;border-bottom:none;transition:all .15s;}
+.tab-btn.active{background:var(--bg);color:var(--text);border-color:var(--border);}
+.pane{display:none;padding:20px;}
+.pane.active{display:block;}
+.kpi-grid{display:flex;gap:10px;flex-wrap:wrap;}
+.kpi{display:flex;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 12px;}
+.kpi .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.kpi .val{font-size:15px;font-weight:800;}
+.kpi .lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;}
+.sec-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;}
+th{background:var(--surface2);color:var(--muted);text-transform:uppercase;font-size:10px;letter-spacing:.08em;padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:7px 10px;border-bottom:1px solid var(--border);font-size:11.5px;vertical-align:top;}
+tr:hover td{background:var(--surface);}
+.badge{display:inline-block;padding:2px 7px;border-radius:3px;font-size:10px;font-weight:600;}
+.badge-H{background:#450a0a;color:var(--waste);}
+.badge-M{background:#451a03;color:var(--a2);}
+.badge-L{background:#052e16;color:var(--a3);}
+.badge-VA{background:#052e16;color:var(--va);}
+.badge-NVA{background:#450a0a;color:var(--nva);}
+.badge-BN{background:#450a0a;color:var(--waste);margin-left:5px;}
+.step-card{border-radius:7px;margin-bottom:8px;background:var(--surface2);overflow:hidden;}
+.step-head{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;background:var(--surface);user-select:none;}
+.step-body{padding:14px;display:none;}
+.step-body.open{display:block;}
+.field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.field-row{margin-bottom:8px;}
+.result-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px 16px;margin-bottom:10px;}
+.result-box .rlabel{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;}
+.result-box .rbig{font-size:24px;font-weight:800;line-height:1;}
+.result-box .rsub{font-size:11px;color:var(--muted);margin-top:3px;}
+.alert{border-radius:6px;padding:11px 14px;margin-top:10px;font-size:12px;line-height:1.65;}
+.alert-R{background:#1a0808;border:1px solid #7f1d1d;color:#fca5a5;}
+.alert-A{background:#1a1000;border:1px solid #78350f;color:#fcd34d;}
+.alert-G{background:#051a0e;border:1px solid #14532d;color:#6ee7b7;}
+.formula-box{background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:10px 14px;font-size:11px;font-family:monospace;color:#a5b4fc;margin:8px 0;line-height:1.9;}
+.analysis-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-bottom:18px;}
+/* VSM diagram styles */
+.vsm-scroll{overflow-x:auto;padding:16px;}
+svg text{font-family:'Inter','Segoe UI',system-ui,sans-serif;}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header" style="background:linear-gradient(135deg,#0f1117,#1a1d27);border-bottom:1px solid var(--border);padding:11px 20px;position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+  <span style="background:var(--accent);color:#fff;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:3px 8px;border-radius:4px;">VSM</span>
+  <span style="font-size:15px;font-weight:600;">IPS Precast — Interactive Value Stream Map</span>
+  <span id="hdr-range" style="color:var(--muted);font-size:11px;margin-left:auto;"></span>
+</div>
+
+<!-- KPI BAR -->
+<div style="background:var(--surface);border-bottom:1px solid var(--border);padding:8px 20px;">
+  <div class="kpi-grid" id="kpi-bar"></div>
+</div>
+
+<!-- GLOBAL CONTROLS -->
+<div style="background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;">
+  <div>
+    <label>▶ Start Point</label>
+    <select id="sel-start" style="width:200px;border-color:var(--accent);"></select>
+  </div>
+  <div>
+    <label>⏹ End Point</label>
+    <select id="sel-end" style="width:200px;border-color:var(--a3);"></select>
+  </div>
+  <div><label>Takt Time (hr/el)</label><input type="number" id="inp-takt" value="0.8" step="0.05" min="0.1" style="width:90px;border-color:var(--push);"/></div>
+  <div><label>Site Demand (el/wk)</label><input type="number" id="inp-demand" value="20" step="1" min="1" style="width:90px;"/></div>
+  <div><label>Shift Hours / Day</label><input type="number" id="inp-shift" value="16" step="1" min="1" max="24" style="width:80px;"/></div>
+  <button onclick="addStep(steps.length)" style="background:var(--accent);color:#fff;margin-left:auto;">＋ Add Step to End</button>
+  <button onclick="resetSteps()" style="background:var(--surface2);color:var(--muted);border:1px solid var(--border);">↺ Reset</button>
+</div>
+
+<!-- TABS -->
+<div style="display:flex;gap:4px;padding:10px 20px 0;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;">
+  <button class="tab-btn active" onclick="showTab('editor')">✏️ Step Editor</button>
+  <button class="tab-btn" onclick="showTab('vsm')">📐 VSM Diagram</button>
+  <button class="tab-btn" onclick="showTab('analysis')">📊 Throughput Analysis</button>
+  <button class="tab-btn" onclick="showTab('multiend')">🎯 Multi-Endpoint</button>
+
+</div>
+
+<!-- PANES -->
+<div id="pane-editor" class="pane active">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+    <div>
+      <div class="sec-title">Process Steps — click to expand &amp; edit</div>
+      <div id="step-list"></div>
+      <button onclick="addStep(steps.length)" style="width:100%;background:var(--surface2);border:1px dashed var(--border);color:var(--muted);padding:10px;margin-top:6px;">＋ Add New Step</button>
+    </div>
+    <div>
+      <div class="sec-title">Quick Analysis</div>
+      <div id="editor-analysis"></div>
+      <div class="formula-box" id="formula-box"></div>
+      <div id="bn-detail"></div>
+    </div>
+  </div>
+</div>
+
+<div id="pane-vsm" class="pane">
+  <div class="sec-title">Standard VSM Diagram — Full Process Flow</div>
+  <div class="vsm-scroll" id="vsm-container"></div>
+</div>
+
+<div id="pane-analysis" class="pane">
+  <div id="analysis-header" class="sec-title"></div>
+  <div id="analysis-kpis" class="analysis-grid"></div>
+  <div class="sec-title" style="margin-top:4px;">Step-by-Step Effective C/T Breakdown</div>
+  <div style="overflow-x:auto;"><table id="analysis-table"></table></div>
+  <div id="oee-section" style="margin-top:20px;"></div>
+</div>
+
+<div id="pane-multiend" class="pane">
+  <div id="multi-header" class="sec-title"></div>
+  <div style="color:var(--muted);font-size:12px;margin-bottom:14px;" id="multi-sub"></div>
+  <div style="overflow-x:auto;"><table id="multi-table"></table></div>
+</div>
+
+
+
+<script>
+// ─────────────────────────────────────────────────────────
+// DATA
+// ─────────────────────────────────────────────────────────
+var nextId = 100;
+var steps = [
+  {id:1,  name:"Build Pre-Cage",            ct:4,   co:1,   avail:85, shifts:2, workers:4, fpy:98,  queueAfter:12, type:"VA",  machines:1, isQueue:false, note:"Rebar cutting, bending & cage assembly — start point"},
+  {id:2,  name:"Install Pre-Cage to Mould", ct:1,   co:0.5, avail:85, shifts:2, workers:3, fpy:99,  queueAfter:0,  type:"VA",  machines:1, isQueue:false, note:"Pre-cage lowered, positioned and tied in mould"},
+  {id:3,  name:"Install M&E on Pre-Cage",   ct:2,   co:0.5, avail:85, shifts:2, workers:3, fpy:97,  queueAfter:0,  type:"VA",  machines:1, isQueue:false, note:"M&E conduit, boxes and sleeves installed on cage"},
+  {id:4,  name:"Pre-Pour QC Inspection",    ct:0.5, co:0,   avail:85, shifts:1, workers:1, fpy:100, queueAfter:0,  type:"NVA", machines:1, isQueue:false, note:"Gate QC — mould, cage, M&E sign-off"},
+  {id:5,  name:"Closing & Casting",         ct:5,   co:2,   avail:85, shifts:2, workers:7, fpy:85,  queueAfter:0,  type:"VA",  machines:8, isQueue:false, note:"Mould close, concrete pour, vibration. x8 moulds"},
+  {id:6,  name:"Curing / Cooling",          ct:24,  co:0,   avail:100,shifts:3, workers:0, fpy:100, queueAfter:24, type:"NVA", machines:1, isQueue:true,  note:"Fixed wait — concrete hydration. No IoT sensing."},
+  {id:7,  name:"De-moulding",               ct:2,   co:0.5, avail:85, shifts:1, workers:3, fpy:96,  queueAfter:0,  type:"VA",  machines:1, isQueue:false, note:"Mould stripping after strength confirmed"},
+  {id:8,  name:"Post Pour Inspection",      ct:0.5, co:0,   avail:85, shifts:1, workers:1, fpy:100, queueAfter:0,  type:"NVA", machines:1, isQueue:false, note:"Post-demould surface and dimensional check"},
+  {id:9,  name:"Rectification",             ct:2,   co:0,   avail:85, shifts:1, workers:2, fpy:100, queueAfter:0,  type:"NVA", machines:1, isQueue:false, note:"Defect rectification and patching where required"},
+  {id:10, name:"Final Inspection",          ct:1,   co:0,   avail:85, shifts:1, workers:1, fpy:95,  queueAfter:48, type:"NVA", machines:1, isQueue:false, note:"Dimensional, surface, M&E QC. Final sign-off."},
+  {id:11, name:"Stockyard Holding",         ct:240, co:0,   avail:100,shifts:3, workers:1, fpy:100, queueAfter:0,  type:"NVA", machines:1, isQueue:true,  note:"Finished goods wait. NOT in erection sequence. Avg 10 days."},
+  {id:12, name:"Load Truck & Dispatch",     ct:1,   co:0.5, avail:85, shifts:1, workers:3, fpy:99,  queueAfter:0,  type:"NVA", machines:1, isQueue:false, note:"QR scan dispatch. Oversized load permit."}
+];
+var defaultSteps = JSON.parse(JSON.stringify(steps));
+
+// ─────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────
+function effCT(s){
+  if(s.isQueue) return +s.ct||0;
+  var a=(+s.avail||100)/100;
+  return a>0?(+s.ct||0)/a:+s.ct||0;
+}
+function drumRate(s){
+  return effCT(s)/(+s.machines||1);
+}
+function findBN(arr){
+  var bn=null, max=-1;
+  arr.forEach(function(s){ if(s.isQueue) return; var d=drumRate(s); if(d>max){max=d;bn=s;} });
+  return bn;
+}
+function analyse(arr){
+  var bn=findBN(arr);
+  var touch=arr.reduce(function(a,s){return a+effCT(s);},0);
+  var queue=arr.reduce(function(a,s){return a+(+s.queueAfter||0);},0);
+  var total=touch+queue;
+  var pct=total>0?(touch/total*100):0;
+  var dr=bn?drumRate(bn):0;
+  var tph=dr>0?1/dr:0;
+  var shiftH=(bn?+bn.shifts||1:1)*8;
+  return{bn:bn,touch:touch,queue:queue,total:total,pct:pct,tph:tph,tpd:tph*shiftH,shiftH:shiftH,dr:dr};
+}
+function getTakt(){ return +document.getElementById('inp-takt').value||0.8; }
+function getStartIdx(){ return +document.getElementById('sel-start').value||0; }
+function getEndIdx(){ return +document.getElementById('sel-end').value||(steps.length-1); }
+function h(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ─────────────────────────────────────────────────────────
+// TABS
+// ─────────────────────────────────────────────────────────
+function showTab(name){
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('.pane').forEach(function(p){ p.classList.remove('active'); });
+  document.getElementById('pane-'+name).classList.add('active');
+  var btns=document.querySelectorAll('.tab-btn');
+  var map={editor:0,vsm:1,analysis:2,multiend:3};
+  if(btns[map[name]]) btns[map[name]].classList.add('active');
+  if(name==='vsm') renderVSM();
+  if(name==='analysis') renderAnalysis();
+  if(name==='multiend') renderMulti();
+}
+
+// ─────────────────────────────────────────────────────────
+// REFRESH — called on any data change
+// ─────────────────────────────────────────────────────────
+function refresh(){
+  refreshSelects();
+  renderKPI();
+  renderHeader();
+  renderStepList();
+  renderEditorAnalysis();
+  // re-render active tab
+  var active=document.querySelector('.pane.active');
+  if(active){
+    var id=active.id.replace('pane-','');
+    if(id==='vsm') renderVSM();
+    else if(id==='analysis') renderAnalysis();
+    else if(id==='multiend') renderMulti();
+  }
+}
+
+function refreshSelects(){
+  var si=getStartIdx(), ei=getEndIdx();
+  si=Math.min(si,steps.length-1); ei=Math.min(ei,steps.length-1);
+  ['sel-start','sel-end'].forEach(function(id){
+    var sel=document.getElementById(id);
+    var val=(id==='sel-start'?si:ei);
+    sel.innerHTML=steps.map(function(s,i){ return '<option value="'+i+'"'+(i===val?' selected':'')+'>'+h(i+1+'. '+s.name)+'</option>'; }).join('');
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// KPI BAR
+// ─────────────────────────────────────────────────────────
+function renderKPI(){
+  var si=getStartIdx(), ei=getEndIdx(), takt=getTakt();
+  var res=analyse(steps.slice(si,ei+1));
+  var overTakt=res.dr>takt;
+  var items=[
+    {v:(res.total/24).toFixed(1)+'d', l:'Throughput Time', c:'var(--accent)'},
+
+    {v:res.pct.toFixed(2)+'%', l:'% VA', c:'var(--a2)'},
+    {v:res.tpd.toFixed(1)+' el/day', l:'Throughput', c:'var(--a3)'},
+    {v:res.bn?res.bn.name:'—', l:'Bottleneck', c:'var(--waste)'},
+    {v:res.dr.toFixed(2)+' vs '+takt.toFixed(2)+' hr', l:'Drum vs Takt', c:overTakt?'var(--waste)':'var(--a3)'},
+  ];
+  document.getElementById('kpi-bar').innerHTML=items.map(function(k){
+    return '<div class="kpi"><div class="dot" style="background:'+k.c+'"></div><div><div class="val" style="color:'+k.c+'">'+h(k.v)+'</div><div class="lbl">'+h(k.l)+'</div></div></div>';
+  }).join('');
+}
+
+function renderHeader(){
+  var si=getStartIdx(), ei=getEndIdx();
+  document.getElementById('hdr-range').innerHTML='<b style="color:var(--accent)">'+h(steps[si]?steps[si].name:'—')+'</b> <span style="color:var(--muted)">→</span> <b style="color:var(--a3)">'+h(steps[ei]?steps[ei].name:'—')+'</b>';
+}
+
+// ─────────────────────────────────────────────────────────
+// STEP LIST (EDITOR TAB)
+// ─────────────────────────────────────────────────────────
+function renderStepList(){
+  var si=getStartIdx(), ei=getEndIdx();
+  var bn=findBN(steps.slice(si,ei+1));
+  var html='';
+  steps.forEach(function(s,i){
+    var isBN=bn&&s.id===bn.id;
+    var bCol=isBN?'#ef4444':s.type==='VA'?'#10b981':'#6366f1';
+    var label='';
+    if(i===si) label+='<span style="color:var(--accent);font-size:9px;font-weight:700;margin-left:6px;">▶ START</span>';
+    if(i===ei) label+='<span style="color:var(--a3);font-size:9px;font-weight:700;margin-left:4px;">⏹ END</span>';
+    var eff=effCT(s).toFixed(2);
+    var dr=drumRate(s).toFixed(2);
+    html+='<div class="step-card" style="border:1.5px solid '+bCol+';">';
+    // arrows
+    html+='<div style="display:flex;gap:5px;align-items:flex-start">';
+    html+='<div style="display:flex;flex-direction:column;gap:3px;padding-top:9px;flex-shrink:0;">';
+    html+='<button onclick="moveStep('+i+',-1)" '+(i===0?'disabled':'')+' style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:1px 5px;font-size:11px;opacity:'+(i===0?.3:1)+'">↑</button>';
+    html+='<button onclick="moveStep('+i+',1)" '+(i===steps.length-1?'disabled':'')+' style="background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:1px 5px;font-size:11px;opacity:'+(i===steps.length-1?.3:1)+'">↓</button>';
+    html+='</div><div style="flex:1;">';
+    html+='<div style="font-size:9px;color:var(--muted);padding:3px 0 0 2px;">Step '+(i+1)+label+'</div>';
+    html+='<div class="step-head" onclick="toggleStep('+s.id+')" style="border-left:3px solid '+bCol+';">';
+    html+='<span style="font-size:11px;color:'+bCol+';">'+(s.isQueue?'⏳':'⚙')+'</span>';
+    html+='<span style="flex:1;font-weight:600;font-size:12px;">'+h(s.name)+'</span>';
+    if(isBN) html+='<span class="badge badge-BN">BN</span>';
+    html+='<span style="font-size:10px;color:var(--muted);">'+(s.isQueue?'Wait '+s.ct+'h':'C/T '+s.ct+'h → Eff '+eff+'h')+'</span>';
+    html+='<span style="color:var(--muted);font-size:11px;margin-left:6px;" id="arr-'+s.id+'">▼</span>';
+    html+='</div>';
+    // body
+    html+='<div class="step-body" id="body-'+s.id+'">';
+    html+='<div class="field-row"><label>Step Name</label><input value="'+h(s.name)+'" onchange="updateField('+s.id+',\'name\',this.value)"/></div>';
+    html+='<div class="field-row"><label>Note</label><input value="'+h(s.note||'')+'" onchange="updateField('+s.id+',\'note\',this.value)"/></div>';
+    html+='<div class="field-grid">';
+    html+=fSel(s,'type','Step Type',['VA','NVA']);
+    html+=fSel(s,'isQueue','Is Queue/Wait?',['No','Yes'],s.isQueue?'Yes':'No');
+    html+=fNum(s,'ct',s.isQueue?'Wait Duration':'Cycle Time (C/T)','hr',0.5);
+    if(!s.isQueue){ html+=fNum(s,'co','Changeover (C/O)','hr',0.5); }
+    if(!s.isQueue){ html+=fNum(s,'avail','Availability / OEE','%',1); }
+    if(!s.isQueue){ html+=fNum(s,'shifts','Shifts / Day','',1); }
+    if(!s.isQueue){ html+=fNum(s,'workers','Workers','',1); }
+    if(!s.isQueue){ html+=fNum(s,'machines','Machines / Moulds (parallel)','',1); }
+    if(!s.isQueue){ html+=fNum(s,'fpy','First Pass Yield (FPY)','%',1); }
+    html+=fNum(s,'queueAfter','Queue / WIP After This Step','hr',1);
+    html+='</div>';
+    if(!s.isQueue){
+      html+='<div style="background:var(--bg);border-radius:5px;padding:8px 12px;font-size:11px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:4px;">';
+      html+='<span>Eff. C/T: <b style="color:var(--a2)">'+eff+' hr</b></span>';
+      html+='<span>Drum Rate: <b style="color:var(--a2)">'+dr+' hr/el</b></span>';
+      html+='<span>Throughput: <b style="color:var(--a3)">'+(1/+dr>0?(1/+dr).toFixed(3):0)+' el/hr</b></span>';
+      html+='</div>';
+    }
+    html+='<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">';
+    html+='<button onclick="addStep('+i+')" style="background:var(--surface);border:1px solid var(--border);color:var(--text);">＋ Before</button>';
+    html+='<button onclick="addStep('+(i+1)+')" style="background:var(--surface);border:1px solid var(--border);color:var(--text);">＋ After</button>';
+    html+='<button onclick="deleteStep('+s.id+')" style="background:#450a0a;color:var(--waste);margin-left:auto;">🗑 Delete</button>';
+    html+='</div>';
+    html+='</div></div></div></div>';
+  });
+  document.getElementById('step-list').innerHTML=html;
+}
+
+function fNum(s,key,lbl,unit,stepV){
+  return '<div class="field-row"><label>'+lbl+(unit?' <span style="color:var(--accent)">'+unit+'</span>':'')+'</label>'
+    +'<input type="number" value="'+(s[key]||0)+'" step="'+(stepV||0.5)+'" min="0" onchange="updateField('+s.id+',\''+key+'\',+this.value)"/></div>';
+}
+function fSel(s,key,lbl,opts,cur){
+  var val=cur!==undefined?cur:s[key];
+  return '<div class="field-row"><label>'+lbl+'</label><select onchange="updateField('+s.id+',\''+key+'\',this.value)">'
+    +opts.map(function(o){return '<option'+(String(o)===String(val)?' selected':'')+'>'+o+'</option>';}).join('')
+    +'</select></div>';
+}
+
+function toggleStep(id){
+  var body=document.getElementById('body-'+id);
+  var arr=document.getElementById('arr-'+id);
+  if(!body) return;
+  body.classList.toggle('open');
+  if(arr) arr.textContent=body.classList.contains('open')?'▲':'▼';
+}
+
+// ─────────────────────────────────────────────────────────
+// EDITOR ANALYSIS PANEL
+// ─────────────────────────────────────────────────────────
+function renderEditorAnalysis(){
+  var si=getStartIdx(), ei=getEndIdx(), takt=getTakt();
+  var slice=steps.slice(si,ei+1);
+  var res=analyse(slice);
+  var overTakt=res.dr>takt;
+  var html='<div class="analysis-grid">';
+  var items=[
+    {l:'Queue / NVA Time',v:res.queue.toFixed(1)+' hr',s:'≈ '+(res.queue/24).toFixed(1)+' days',c:'var(--nva)'},
+    {l:'Total Throughput Time',v:res.total.toFixed(2)+' hr',s:'≈ '+(res.total/24).toFixed(1)+' days',c:'var(--accent)'},
+    {l:'% VA',v:res.pct.toFixed(2)+'%',s:'Process Time ÷ '+res.total.toFixed(1)+'h total',c:'var(--a2)'},
+    {l:'Throughput',v:res.tpd.toFixed(1)+' el/day',s:res.tph.toFixed(3)+' el/hr',c:'var(--a3)'},
+    {l:'Drum vs Takt',v:res.dr.toFixed(2)+' vs '+takt.toFixed(2)+' hr',s:overTakt?'⚠ OVER by '+(res.dr-takt).toFixed(2)+'h':'✓ Under by '+(takt-res.dr).toFixed(2)+'h',c:overTakt?'var(--waste)':'var(--a3)'},
+  ];
+  html+=items.map(function(k){
+    return '<div class="result-box"><div class="rlabel">'+k.l+'</div><div class="rbig" style="color:'+k.c+'">'+h(k.v)+'</div><div class="rsub">'+h(k.s)+'</div></div>';
+  }).join('');
+  html+='</div>';
+  document.getElementById('editor-analysis').innerHTML=html;
+
+  document.getElementById('formula-box').innerHTML=[
+    'Eff. C/T  = Raw C/T &divide; Availability',
+    'Drum Rate = Eff. C/T &divide; Machine Count',
+    'Throughput = 1 &divide; Drum Rate (el/hr)',
+    'Takt Time  = Shift Hours &divide; Daily Demand',
+    'Thru. Time = &Sigma; Eff.C/T + &Sigma; Queue',
+    '% VA       = Process Time &divide; Total Time &times; 100',
+  ].join('<br>');
+
+  var bnd='';
+  if(res.bn){
+    var b=res.bn;
+    bnd='<div class="alert alert-R" style="margin-top:10px;">';
+    bnd+='<b style="color:var(--waste);">⚠ Bottleneck: '+h(b.name)+'</b><br>';
+    bnd+='Raw C/T: '+b.ct+'h | Avail: '+b.avail+'% | Machines: ×'+b.machines+'<br>';
+    bnd+='Eff.C/T: '+effCT(b).toFixed(2)+'h | Drum: '+drumRate(b).toFixed(2)+' hr/el<br>';
+    bnd+='Throughput: '+(1/drumRate(b)).toFixed(2)+' el/hr | '+((1/drumRate(b))*(+b.shifts||1)*8).toFixed(1)+' el/day<br>';
+    var ot=drumRate(b)>takt;
+    bnd+='vs Takt '+takt+'h: <b style="color:'+(ot?'#ef4444':'#10b981')+'">'+(ot?'⚠ OVER by '+(drumRate(b)-takt).toFixed(2)+'h':'✓ under by '+(takt-drumRate(b)).toFixed(2)+'h')+'</b>';
+    bnd+='</div>';
+  }
+  document.getElementById('bn-detail').innerHTML=bnd;
+}
+
+// ─────────────────────────────────────────────────────────
+// VSM DIAGRAM TAB
+// ─────────────────────────────────────────────────────────
+function renderVSM(){
+  var si=getStartIdx(), ei=getEndIdx();
+  // bn is calculated only from the selected range, matching editor/analysis
+  var slice=steps.slice(si,ei+1);
+  var bn=findBN(slice);
+  var allSteps=steps;
+
+  // Layout constants
+  var BOX_W=148, BOX_H=80, DATA_H=148, GAP=18;
+  var totalSteps=allSteps.length;
+  var svgW=Math.max(1600, totalSteps*(BOX_W+GAP)+200);
+  var svgH=1090;
+
+  // Y positions
+  var INFO_Y=10, PROC_Y=210, DATA_Y=295, LOG_Y=470;
+  // Timeline Y — axis is the horizontal centre line
+  // NVA blocks rise ABOVE axis (y < AXIS_Y), VA peaks drop BELOW (y > AXIS_Y)
+  var AXIS_Y=680;   // the flat baseline
+  var NVA_H=52;     // height of NVA (lead time) blocks above axis
+  var VA_H=68;      // height of VA (process time) peaks below axis
+  var LABEL_GAP=10; // gap between block edge and external label
+  var STEPNAME_Y=AXIS_Y+VA_H+58;  // step name row — clear of VA ticks
+  var TOT_Y=AXIS_Y+VA_H+110;      // totals summary bar — clear of 3 name rows
+
+  // Start X for first process box
+  var startX=120;
+
+  function boxX(i){ return startX + i*(BOX_W+GAP); }
+
+  var svg='<svg viewBox="0 0 '+svgW+' '+svgH+'" xmlns="http://www.w3.org/2000/svg" style="min-width:'+svgW+'px;width:100%;font-family:Inter,sans-serif;">';
+
+  // ── DEFS ──
+  svg+='<defs>';
+  svg+='<marker id="a0" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#94a3b8"/></marker>';
+  svg+='<marker id="a1" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#6366f1"/></marker>';
+  svg+='<marker id="a2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#f59e0b"/></marker>';
+  svg+='<marker id="a3" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#10b981"/></marker>';
+
+  // Factory symbol
+  svg+='<symbol id="fac" viewBox="0 0 44 44"><rect x="4" y="20" width="36" height="22" fill="none" stroke="currentColor" stroke-width="1.8"/><polyline points="2,22 22,6 42,22" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="14" y="28" width="8" height="14" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="26" y="26" width="10" height="8" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>';
+  svg+='<symbol id="store" viewBox="0 0 44 44"><rect x="4" y="16" width="36" height="26" fill="none" stroke="currentColor" stroke-width="1.8"/><polyline points="2,18 22,4 42,18" fill="none" stroke="currentColor" stroke-width="1.8"/><line x1="4" y1="28" x2="40" y2="28" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="30" width="8" height="12" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="26" y="30" width="8" height="12" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>';
+  svg+='<symbol id="truck" viewBox="0 0 54 34"><rect x="2" y="8" width="32" height="20" fill="none" stroke="currentColor" stroke-width="1.8"/><polygon points="34,12 52,12 52,28 34,28" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="30" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="44" cy="30" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>';
+  svg+='<symbol id="op" viewBox="0 0 20 20"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="7" cy="8" r="1.2" fill="currentColor"/><circle cx="13" cy="8" r="1.2" fill="currentColor"/><path d="M6,13 Q10,17 14,13" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>';
+  svg+='<symbol id="inv" viewBox="0 0 24 20"><polygon points="12,2 22,18 2,18" fill="#f59e0b" opacity=".85"/><text x="12" y="15" fill="#000" font-size="9" font-weight="800" text-anchor="middle">I</text></symbol>';
+  svg+='<symbol id="kz" viewBox="0 0 40 40"><path d="M20,2 L24,13 L35,8 L30,18 L40,17 L32,24 L38,33 L28,28 L26,39 L20,30 L14,39 L12,28 L2,33 L8,24 L0,17 L10,18 L5,8 L16,13 Z" fill="#f59e0b" opacity=".9"/><text x="20" y="24" fill="#000" font-size="7" font-weight="800" text-anchor="middle">KAIZEN</text></symbol>';
+  svg+='</defs>';
+
+  // ── BACKGROUND BANDS ──
+  svg+='<rect x="0" y="0" width="'+svgW+'" height="185" fill="#0d1020"/>';
+  svg+='<text x="16" y="16" fill="#334155" font-size="9" font-weight="700" letter-spacing=".15em">INFORMATION FLOW</text>';
+  svg+='<rect x="0" y="185" width="'+svgW+'" height="260" fill="#0f1320"/>';
+  svg+='<text x="16" y="200" fill="#334155" font-size="9" font-weight="700" letter-spacing=".12em">MATERIAL FLOW — PRODUCTION (Malaysia / JB)</text>';
+  svg+='<rect x="0" y="445" width="'+svgW+'" height="115" fill="#0a0e1a"/>';
+  svg+='<text x="16" y="461" fill="#334155" font-size="9" font-weight="700" letter-spacing=".12em">LOGISTICS — CROSS-BORDER (JB → SG PORT → CUSTOMS → SITE)</text>';
+  svg+='<rect x="0" y="560" width="'+svgW+'" height="530" fill="#0d1020"/>';
+  svg+='<text x="16" y="576" fill="#334155" font-size="9" font-weight="700" letter-spacing=".12em">TIMELINE — Lead Time (above axis) vs Process Time (below axis)</text>';
+
+  // ── PLANNING UNIT ──
+  var midX=svgW/2;
+  svg+='<rect x="'+(midX-90)+'" y="18" width="180" height="46" rx="6" fill="#1a1d27" stroke="#6366f1" stroke-width="2"/>';
+  svg+='<text x="'+midX+'" y="39" fill="#6366f1" font-size="12" font-weight="700" text-anchor="middle">PLANNING UNIT</text>';
+  svg+='<text x="'+midX+'" y="54" fill="#94a3b8" font-size="9" text-anchor="middle">MRP / Production Control (Push)</text>';
+
+  // Info arrows to processes
+  allSteps.forEach(function(s,i){
+    var px=boxX(i)+BOX_W/2;
+    svg+='<line x1="'+midX+'" y1="64" x2="'+px+'" y2="'+PROC_Y+'" stroke="#6366f1" stroke-width=".9" stroke-dasharray="4 3" marker-end="url(#a1)"/>';
+  });
+
+  // Info to supplier
+  svg+='<path d="M'+(midX-90)+',42 Q200,42 80,115" fill="none" stroke="#6366f1" stroke-width="1.1" stroke-dasharray="5 3" marker-end="url(#a1)"/>';
+  svg+='<text x="200" y="36" fill="#6366f1" font-size="8">Purchase Order</text>';
+
+  // Info to customer
+  var custX=svgW-80;
+  svg+='<path d="M'+(midX+90)+',42 Q'+(svgW-300)+',42 '+(custX-60)+',55" fill="none" stroke="#6366f1" stroke-width="1.1" stroke-dasharray="5 3" marker-end="url(#a1)"/>';
+  svg+='<text x="'+(svgW-400)+'" y="36" fill="#6366f1" font-size="8">Delivery Schedule</text>';
+  svg+='<path d="M'+(custX-60)+',55 Q'+(custX-60)+',42 '+(midX+90)+',42" fill="none" stroke="#94a3b8" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#a0)"/>';
+  svg+='<text x="'+(svgW-350)+'" y="16" fill="#94a3b8" font-size="8">Forecast / Order</text>';
+
+  // ── SUPPLIER ──
+  svg+='<use href="#fac" x="14" y="26" width="50" height="50" color="#3b82f6"/>';
+  svg+='<text x="39" y="88" fill="#3b82f6" font-size="10" font-weight="700" text-anchor="middle">SUPPLIER</text>';
+  svg+='<text x="39" y="100" fill="#64748b" font-size="8.5" text-anchor="middle">Rebar/Concrete</text>';
+  svg+='<use href="#truck" x="14" y="112" width="50" height="30" color="#94a3b8"/>';
+  svg+='<text x="39" y="150" fill="#64748b" font-size="8" text-anchor="middle">3×/week</text>';
+
+  // ── RAW MATERIAL STORE ──
+  svg+='<use href="#store" x="14" y="192" width="50" height="50" color="#94a3b8"/>';
+  svg+='<text x="39" y="253" fill="#94a3b8" font-size="9" font-weight="600" text-anchor="middle">Raw Material</text>';
+  svg+='<text x="39" y="264" fill="#94a3b8" font-size="9" font-weight="600" text-anchor="middle">Store</text>';
+  svg+='<line x1="64" y1="145" x2="39" y2="192" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a0)"/>';
+  svg+='<line x1="64" y1="242" x2="'+boxX(0)+'" y2="242" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#a0)"/>';
+  // inv triangle before first step
+  svg+='<use href="#inv" x="68" y="272" width="24" height="20"/>';
+  svg+='<text x="80" y="306" fill="#f59e0b" font-size="8" text-anchor="middle">20d</text>';
+
+  // ── CUSTOMER BOX ──
+  svg+='<rect x="'+(svgW-185)+'" y="20" width="175" height="100" rx="5" fill="#0d1f17" stroke="#10b981" stroke-width="1.5"/>';
+  svg+='<text x="'+(svgW-97)+'" y="40" fill="#10b981" font-size="10" font-weight="700" text-anchor="middle">SITE DEMAND</text>';
+  svg+='<line x1="'+(svgW-185)+'" y1="46" x2="'+(svgW-10)+'" y2="46" stroke="#10b981" stroke-width=".8" opacity=".4"/>';
+  svg+='<text x="'+(svgW-180)+'" y="60" fill="#e2e8f0" font-size="9">~20 elements / week</text>';
+  svg+='<text x="'+(svgW-180)+'" y="73" fill="#e2e8f0" font-size="9">Delivery: JIT to crane</text>';
+  svg+='<text x="'+(svgW-180)+'" y="86" fill="#f59e0b" font-size="9" font-weight="700">Takt = '+getTakt().toFixed(2)+' hr / element</text>';
+  svg+='<text x="'+(svgW-180)+'" y="99" fill="#ef4444" font-size="8.5">Drum = '+findBN(allSteps)? drumRate(findBN(allSteps)||{ct:0,avail:100,machines:1}).toFixed(2):'—' +' hr / el</text>';
+  svg+='<use href="#fac" x="'+(svgW-55)+'" y="26" width="46" height="46" color="#10b981"/>';
+
+  // ── PROCESS BOXES ──
+  allSteps.forEach(function(s,i){
+    var x=boxX(i);
+    var inRange=(i>=si && i<=ei);
+    var isBN=inRange && bn && s.id===bn.id;
+    var isStart=(i===si), isEnd=(i===ei);
+
+    // Dim steps outside selected range
+    var dimOpacity=inRange?1:0.3;
+
+    var fillCol=isBN?'#2a1515':s.isQueue?'#1a1a2a':s.type==='VA'?'#1a1f2e':'#0d1f17';
+    var strokeCol=isBN?'#ef4444':s.isQueue?'#6366f1':inRange?(s.type==='VA'?'#334155':'#10b981'):'#2e3350';
+    var strokeW=isBN?2.5:1.8;
+    var textCol=isBN?'#ef4444':s.isQueue?'#a5b4fc':s.type==='VA'?'#e2e8f0':'#10b981';
+
+    // Dim wrapper
+    svg+='<g opacity="'+dimOpacity+'">';
+
+    // START/END banners
+    if(isStart){
+      svg+='<rect x="'+x+'" y="'+(PROC_Y-13)+'" width="'+BOX_W+'" height="12" rx="3" fill="#1e3a5f"/>';
+      svg+='<text x="'+(x+BOX_W/2)+'" y="'+(PROC_Y-4)+'" fill="#3b82f6" font-size="8" font-weight="700" text-anchor="middle">▶ START</text>';
+    }
+    if(isEnd){
+      svg+='<rect x="'+x+'" y="'+(PROC_Y-13)+'" width="'+BOX_W+'" height="12" rx="3" fill="#052e16"/>';
+      svg+='<text x="'+(x+BOX_W/2)+'" y="'+(PROC_Y-4)+'" fill="#10b981" font-size="8" font-weight="700" text-anchor="middle">⏹ END</text>';
+    }
+
+    // Process rect
+    svg+='<rect x="'+x+'" y="'+PROC_Y+'" width="'+BOX_W+'" height="'+BOX_H+'" rx="5" fill="'+fillCol+'" stroke="'+strokeCol+'" stroke-width="'+strokeW+'"'+(s.isQueue?' stroke-dasharray="6 3"':'')+'/>';
+
+    // Step name (wrap at ~16 chars)
+    var name=s.name;
+    var words=name.split(' ');
+    var lines=[''], li=0;
+    words.forEach(function(w){ if((lines[li]+' '+w).trim().length>16){li++;lines[li]='';} lines[li]=(lines[li]+' '+w).trim(); });
+    lines=lines.slice(0,3);
+    var nameY=PROC_Y+(lines.length===1?28:lines.length===2?22:16);
+    lines.forEach(function(ln,j){
+      svg+='<text x="'+(x+BOX_W/2)+'" y="'+(nameY+j*13)+'" fill="'+textCol+'" font-size="9.5" font-weight="700" text-anchor="middle">'+h(ln)+'</text>';
+    });
+
+    // Bottleneck label
+    if(isBN){
+      svg+='<text x="'+(x+BOX_W/2)+'" y="'+(PROC_Y+58)+'" fill="#ef4444" font-size="8" font-weight="700" text-anchor="middle">⚠ BOTTLENECK</text>';
+    }
+
+    // Operators
+    var wkCnt=Math.min(+s.workers||0,4);
+    var opY=PROC_Y+BOX_H-20;
+    for(var w=0;w<wkCnt;w++){
+      svg+='<use href="#op" x="'+(x+10+w*19)+'" y="'+opY+'" width="16" height="16" color="'+textCol+'"/>';
+    }
+    if(+s.workers>4) svg+='<text x="'+(x+BOX_W-8)+'" y="'+(opY+12)+'" fill="'+textCol+'" font-size="8">×'+s.workers+'</text>';
+
+    // Machine count badge
+    if(!s.isQueue && +s.machines>1){
+      svg+='<rect x="'+(x+4)+'" y="'+(PROC_Y+BOX_H-18)+'" width="'+(s.machines>9?40:34)+'" height="13" rx="3" fill="'+(isBN?'#450a0a':'#1e3a5f')+'"/>';
+      svg+='<text x="'+(x+6)+'" y="'+(PROC_Y+BOX_H-7)+'" fill="'+(isBN?'#ef4444':'#3b82f6')+'" font-size="8" font-weight="700">×'+s.machines+' moulds</text>';
+    }
+
+    // DATA BOX
+    var dy=DATA_Y;
+    svg+='<rect x="'+x+'" y="'+dy+'" width="'+BOX_W+'" height="'+DATA_H+'" rx="3" fill="'+(isBN?'#1a0808':'#12151f')+'" stroke="'+(isBN?'#ef4444':'#2e3350')+'" stroke-width="'+(isBN?1.2:1)+'"/>';
+    var fields=s.isQueue?[
+      ['Wait',s.ct+'h'],
+      ['Eff.C/T',effCT(s).toFixed(2)+'h'],
+      ['Workers',''+s.workers],
+      ['IoT?','No'],
+    ]:[
+      ['C/T',s.ct+'h'],
+      ['Eff.C/T',effCT(s).toFixed(2)+'h'],
+      ['C/O',s.co+'h'],
+      ['Avail',s.avail+'%'],
+      ['Shifts',''+s.shifts],
+      ['Workers',''+s.workers],
+      ['FPY',s.fpy+'%'],
+    ];
+    var labelX=x+5, valueX=x+58; // label col and value col
+    fields.forEach(function(f,fi){
+      var fy=dy+12+fi*16;
+      svg+='<text x="'+labelX+'" y="'+fy+'" fill="#64748b" font-size="8" font-weight="700">'+f[0]+'</text>';
+      var vc=(f[0]==='Eff.C/T'&&isBN)?'#ef4444':(f[0]==='C/T'&&s.type==='VA')?'#10b981':'#e2e8f0';
+      svg+='<text x="'+valueX+'" y="'+fy+'" fill="'+vc+'" font-size="8" font-weight="'+(f[0]==='Eff.C/T'?700:400)+'">'+h(f[1])+'</text>';
+    });
+    // WIP and Drum on last two rows
+    var lastRowY=dy+DATA_H-18;
+    svg+='<text x="'+labelX+'" y="'+lastRowY+'" fill="#64748b" font-size="7.5">WIP</text>';
+    svg+='<text x="'+valueX+'" y="'+lastRowY+'" fill="#64748b" font-size="7.5">'+(s.queueAfter>0?s.queueAfter+'h':'—')+'</text>';
+    if(!s.isQueue){
+      var dr=drumRate(s);
+      var drumRowY=dy+DATA_H-4;
+      svg+='<text x="'+labelX+'" y="'+drumRowY+'" fill="'+(isBN?'#ef4444':'#6366f1')+'" font-size="7.5" font-weight="700">Drum</text>';
+      svg+='<text x="'+valueX+'" y="'+drumRowY+'" fill="'+(isBN?'#ef4444':'#6366f1')+'" font-size="7.5" font-weight="700">'+dr.toFixed(2)+'h/el</text>';
+    }
+
+    // KAIZEN burst on bottleneck and queue steps (only in range)
+    if(inRange && (isBN||s.isQueue)){
+      svg+='<use href="#kz" x="'+(x+BOX_W-6)+'" y="'+(PROC_Y-20)+'" width="36" height="36"/>';
+    }
+
+    // QC gate badge
+    if(s.type==='NVA'&&!s.isQueue){
+      svg+='<rect x="'+(x+BOX_W/2-16)+'" y="'+(PROC_Y-12)+'" width="32" height="12" rx="3" fill="#052e16" stroke="#10b981" stroke-width=".8"/>';
+      svg+='<text x="'+(x+BOX_W/2)+'" y="'+(PROC_Y-3)+'" fill="#10b981" font-size="7.5" text-anchor="middle" font-weight="700">QC</text>';
+    }
+
+    svg+='</g>';
+
+    // PUSH arrow to next step — show within range in purple, out-of-range in grey
+    if(i<allSteps.length-1){
+      var nx=boxX(i+1);
+      var ay=PROC_Y+BOX_H/2;
+      var arrowInRange=(i>=si && i<ei);
+      var arrowCol=arrowInRange?'#6366f1':'#2e3350';
+      var arrowOpacity=arrowInRange?0.9:0.25;
+      svg+='<polygon points="'+(x+BOX_W)+','+ay+' '+(nx-4)+','+(ay-7)+' '+(nx-4)+','+(ay+7)+'" fill="'+arrowCol+'" opacity="'+arrowOpacity+'"/>';
+      if(arrowInRange){
+        svg+='<text x="'+(x+BOX_W+4)+'" y="'+(ay-4)+'" fill="#6366f1" font-size="7" font-weight="700">PUSH</text>';
+      }
+    }
+
+    // Inventory triangle between steps — only show within range
+    if(i<allSteps.length-1){
+      var ivx=boxX(i+1)-18;
+      var triOpacity=(i>=si && i<ei)?1:0.2;
+      svg+='<g opacity="'+triOpacity+'">';
+      svg+='<use href="#inv" x="'+ivx+'" y="'+(DATA_Y+4)+'" width="22" height="18"/>';
+      var qh=allSteps[i].queueAfter||0;
+      svg+='<text x="'+(ivx+11)+'" y="'+(DATA_Y+32)+'" fill="#f59e0b" font-size="7.5" text-anchor="middle">'+(qh>0?qh+'h':'—')+'</text>';
+      svg+='</g>';
+    }
+
+    // Arrow to last customer
+    if(i===allSteps.length-1){
+      svg+='<line x1="'+(x+BOX_W)+'" y1="'+(PROC_Y+BOX_H/2)+'" x2="'+(svgW-185)+'" y2="70" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#a3)"/>';
+    }
+
+    // Logistics row (simplified for last 4 steps)
+    if(i>=allSteps.length-4 && allSteps.length>4){
+      var lx=boxX(i);
+      svg+='<rect x="'+lx+'" y="472" width="'+BOX_W+'" height="40" rx="4" fill="#12151f" stroke="'+(i===allSteps.length-1?'#10b981':'#2e3350')+'" stroke-width="1.2"/>';
+      var logLabels=['Transit JB→Port','SG Customs','In Transit SG','Arrive Site'];
+      svg+='<text x="'+(lx+BOX_W/2)+'" y="488" fill="'+(i===allSteps.length-1?'#10b981':'#e2e8f0')+'" font-size="8.5" font-weight="600" text-anchor="middle">'+h(logLabels[i-(allSteps.length-4)])+'</text>';
+      svg+='<text x="'+(lx+BOX_W/2)+'" y="502" fill="#64748b" font-size="8" text-anchor="middle">'+(i===allSteps.length-4?'0.5–3 hr':i===allSteps.length-3?'0.5–6 hr':i===allSteps.length-2?'0.5–2 hr':'CT: 2 hr')+'</text>';
+      if(i<allSteps.length-1){
+        svg+='<line x1="'+(lx+BOX_W)+'" y1="492" x2="'+(boxX(i+1))+'" y2="492" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#a0)"/>';
+      }
+      // truck icon under last process
+      if(i===allSteps.length-1){
+        svg+='<use href="#truck" x="'+(lx+BOX_W/2-22)+'" y="455" width="44" height="26" color="#94a3b8"/>';
+        svg+='<line x1="'+(lx+BOX_W/2)+'" y1="'+(DATA_Y+DATA_H)+'" x2="'+(lx+BOX_W/2)+'" y2="455" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#a0)"/>';
+      }
+    }
+  });
+
+  // ── REWORK LOOP (if FPY < 95 exists within range) ──
+  var reworkStep=null;
+  slice.forEach(function(s,i){
+    var globalI=si+i;
+    if(s.fpy<95&&!s.isQueue&&globalI>si) reworkStep={s:s,i:globalI};
+  });
+  if(reworkStep){
+    var rx=boxX(reworkStep.i), prevX=boxX(reworkStep.i-1);
+    svg+='<path d="M'+(rx+BOX_W/2)+','+PROC_Y+' Q'+(rx+BOX_W/2)+','+(PROC_Y-30)+' '+(rx-GAP/2)+','+(PROC_Y-30)+' Q'+(prevX+BOX_W)+','+(PROC_Y-30)+' '+(prevX+BOX_W/2)+','+PROC_Y+'" fill="none" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#a2)"/>';
+    svg+='<text x="'+(prevX+BOX_W)+'" y="'+(PROC_Y-34)+'" fill="#f59e0b" font-size="8" text-anchor="middle">Rework (~'+(100-reworkStep.s.fpy)+'%)</text>';
+  }
+
+  // ════════════════════════════════════════════════════════
+  // ZIGZAG TIMELINE LADDER — pixel-aligned to process boxes
+  // ════════════════════════════════════════════════════════
+  // Each VA segment sits directly under its process box (same x, same width).
+  // Each NVA/Queue segment sits in the gap between boxes (inventory triangle area).
+  var axisX0=boxX(si), axisX1=boxX(ei)+BOX_W;
+
+  // ── Full-height zone background bands ──
+  svg+='<rect x="0" y="'+(AXIS_Y-NVA_H)+'" width="'+svgW+'" height="'+NVA_H+'" fill="#ef4444" opacity=".07"/>';
+  svg+='<rect x="0" y="'+AXIS_Y+'" width="'+svgW+'" height="'+VA_H+'" fill="#10b981" opacity=".07"/>';
+
+  // ── LEFT-SIDE ZONE LABEL BLOCKS ──
+  svg+='<rect x="0" y="'+(AXIS_Y-NVA_H)+'" width="112" height="'+NVA_H+'" fill="#ef4444" opacity=".92"/>';
+  svg+='<text x="56" y="'+(AXIS_Y-NVA_H/2-6)+'" fill="#fff" font-size="12" font-weight="800" text-anchor="middle" dominant-baseline="middle">NVA</text>';
+  svg+='<text x="56" y="'+(AXIS_Y-NVA_H/2+10)+'" fill="#fff" font-size="9" font-weight="600" text-anchor="middle" dominant-baseline="middle">Lead Time</text>';
+  svg+='<rect x="0" y="'+AXIS_Y+'" width="112" height="'+VA_H+'" fill="#10b981" opacity=".92"/>';
+  svg+='<text x="56" y="'+(AXIS_Y+VA_H/2-6)+'" fill="#fff" font-size="12" font-weight="800" text-anchor="middle" dominant-baseline="middle">VA</text>';
+  svg+='<text x="56" y="'+(AXIS_Y+VA_H/2+10)+'" fill="#fff" font-size="9" font-weight="600" text-anchor="middle" dominant-baseline="middle">Process Time</text>';
+
+  // ── Axis baseline ──
+  svg+='<line x1="'+boxX(0)+'" y1="'+AXIS_Y+'" x2="'+(boxX(allSteps.length-1)+BOX_W)+'" y2="'+AXIS_Y+'" stroke="#2e3350" stroke-width="1" opacity=".3"/>';
+
+  // ── Build pixel-aligned segments ──
+  // Process step: x = boxX(globalIdx), width = BOX_W  (aligns with process box)
+  // Queue gap:    x = boxX(globalIdx)+BOX_W, width = GAP  (aligns with inventory triangle gap)
+  var segs=[];
+  slice.forEach(function(s,i){
+    var globalIdx=si+i;
+    var isBN=bn&&s.id===bn.id;
+    var isVA=!s.isQueue&&s.type==='VA';
+    // Process segment — fixed width = BOX_W, pinned to boxX
+    segs.push({
+      type: isVA?'VA':'NVA',
+      x: boxX(globalIdx),
+      w: BOX_W,
+      label: effCT(s).toFixed(1)+'h',
+      col: isBN?'#ef4444':isVA?'#10b981':'#6366f1',
+      isBN: isBN,
+      stepName: s.name,
+      isQueue: s.isQueue
+    });
+    // Queue/inventory segment — sits in the GAP after this box (= inventory triangle zone)
+    if((+s.queueAfter||0)>0 && globalIdx<ei){
+      segs.push({
+        type:'QUEUE',
+        x: boxX(globalIdx)+BOX_W,
+        w: GAP,
+        label: (+s.queueAfter).toFixed(0)+'h',
+        col:'#f59e0b',
+        isBN: false,
+        stepName: s.queueAfter+'h wait',
+        isQueue: true
+      });
+    }
+  });
+
+  // ── Draw blocks, zigzag and labels ──
+  var polyPts=[[axisX0, AXIS_Y]];
+  var nvaTickSlots=[];
+  var vaTickSlots=[];
+  var nameSlots=[];
+  var MIN_LABEL_GAP=28;
+  var MIN_W_INTERNAL=36;
+
+  segs.forEach(function(seg){
+    var x0=seg.x, x1=seg.x+seg.w;
+    var midX=x0+seg.w/2;
+
+    if(seg.type==='VA'){
+      // ── VA peak (below axis) ──
+      svg+='<rect x="'+x0+'" y="'+AXIS_Y+'" width="'+seg.w+'" height="'+VA_H+'" fill="'+seg.col+'" opacity=".88" rx="2"/>';
+      svg+='<line x1="'+x0+'" y1="'+(AXIS_Y-NVA_H)+'" x2="'+x0+'" y2="'+(AXIS_Y+VA_H)+'" stroke="#0d1020" stroke-width="1.2" opacity=".6"/>';
+      svg+='<line x1="'+x1+'" y1="'+(AXIS_Y-NVA_H)+'" x2="'+x1+'" y2="'+(AXIS_Y+VA_H)+'" stroke="#0d1020" stroke-width="1.2" opacity=".6"/>';
+      if(seg.w>=MIN_W_INTERNAL){
+        var fs=seg.w>80?10:seg.w>50?8.5:7.5;
+        svg+='<text x="'+midX+'" y="'+(AXIS_Y+VA_H/2+4)+'" fill="#fff" font-size="'+fs+'" font-weight="700" text-anchor="middle">'+seg.label+(seg.isBN?' ⚠':'')+'</text>';
+      } else {
+        // Stagger narrow labels below VA zone
+        var clash=vaTickSlots.some(function(sl){return Math.abs(midX-sl.mx)<MIN_LABEL_GAP;});
+        var tRow=clash?2:1;
+        var tY=AXIS_Y+VA_H+8+(tRow-1)*13;
+        svg+='<line x1="'+midX+'" y1="'+(AXIS_Y+VA_H)+'" x2="'+midX+'" y2="'+(tY-3)+'" stroke="'+seg.col+'" stroke-width="1" opacity=".5"/>';
+        svg+='<text x="'+midX+'" y="'+tY+'" fill="'+seg.col+'" font-size="7.5" font-weight="700" text-anchor="middle">'+seg.label+(seg.isBN?' ⚠':'')+'</text>';
+        vaTickSlots.push({mx:midX});
+      }
+      polyPts.push([x0,AXIS_Y],[x0,AXIS_Y+VA_H],[x1,AXIS_Y+VA_H],[x1,AXIS_Y]);
+    } else {
+      // ── NVA/QUEUE block (above axis) ──
+      svg+='<rect x="'+x0+'" y="'+(AXIS_Y-NVA_H)+'" width="'+seg.w+'" height="'+NVA_H+'" fill="'+seg.col+'" opacity="'+(seg.type==='QUEUE'?.70:.80)+'" rx="2"/>';
+      svg+='<line x1="'+x0+'" y1="'+(AXIS_Y-NVA_H)+'" x2="'+x0+'" y2="'+(AXIS_Y+VA_H)+'" stroke="#0d1020" stroke-width="1.2" opacity=".6"/>';
+      svg+='<line x1="'+x1+'" y1="'+(AXIS_Y-NVA_H)+'" x2="'+x1+'" y2="'+(AXIS_Y+VA_H)+'" stroke="#0d1020" stroke-width="1.2" opacity=".6"/>';
+      if(seg.w>=MIN_W_INTERNAL){
+        var fs3=seg.w>80?10:seg.w>50?8.5:7.5;
+        svg+='<text x="'+midX+'" y="'+(AXIS_Y-NVA_H/2+4)+'" fill="#fff" font-size="'+fs3+'" font-weight="700" text-anchor="middle">'+seg.label+'</text>';
+      } else {
+        // Stagger narrow labels above NVA zone
+        var clash2=nvaTickSlots.some(function(sl){return Math.abs(midX-sl.mx)<MIN_LABEL_GAP;});
+        var tRow2=clash2?2:1;
+        var tY2=AXIS_Y-NVA_H-8-(tRow2-1)*13;
+        svg+='<line x1="'+midX+'" y1="'+(AXIS_Y-NVA_H)+'" x2="'+midX+'" y2="'+(tY2+5)+'" stroke="'+seg.col+'" stroke-width="1" opacity=".5"/>';
+        svg+='<text x="'+midX+'" y="'+tY2+'" fill="'+seg.col+'" font-size="7.5" font-weight="700" text-anchor="middle">'+seg.label+'</text>';
+        nvaTickSlots.push({mx:midX});
+      }
+      polyPts.push([x0,AXIS_Y],[x0,AXIS_Y-NVA_H],[x1,AXIS_Y-NVA_H],[x1,AXIS_Y]);
+    }
+
+    // ── Step name — track slots and use up to 3 stagger rows ──
+    var dispName=seg.stepName.length>18?seg.stepName.slice(0,17)+'…':seg.stepName;
+    var nameCol=seg.type==='VA'?seg.col:seg.type==='QUEUE'?'#f59e0b':'#94a3b8';
+    // Find first non-overlapping row (max 3 rows)
+    var nameRow=STEPNAME_Y;
+    for(var nr=0;nr<3;nr++){
+      var rowY=STEPNAME_Y+nr*14;
+      var rowClear=!nameSlots.some(function(sl){
+        return sl.row===rowY && Math.abs(midX-sl.mx)<(sl.hw+dispName.length*4.5+6);
+      });
+      if(rowClear){nameRow=rowY; break;}
+    }
+    var connFromY=seg.type==='VA'?(AXIS_Y+VA_H+2):(AXIS_Y-NVA_H-2);
+    svg+='<line x1="'+midX+'" y1="'+connFromY+'" x2="'+midX+'" y2="'+(nameRow-10)+'" stroke="'+nameCol+'" stroke-width="0.7" stroke-dasharray="2 2" opacity=".3"/>';
+    svg+='<text x="'+midX+'" y="'+nameRow+'" fill="'+nameCol+'" font-size="8" text-anchor="middle">'+h(dispName)+'</text>';
+    nameSlots.push({mx:midX, hw:dispName.length*4.5, row:nameRow});
+  });
+
+  polyPts.push([axisX1, AXIS_Y]);
+
+  // ── Draw zigzag outline polyline ──
+  var ptStr=polyPts.map(function(p){return p[0]+','+p[1];}).join(' ');
+  svg+='<polyline points="'+ptStr+'" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linejoin="miter"/>';
+
+  // ── Axis line (drawn on top) ──
+  svg+='<line x1="'+axisX0+'" y1="'+AXIS_Y+'" x2="'+axisX1+'" y2="'+AXIS_Y+'" stroke="#e2e8f0" stroke-width="2.5"/>';
+
+  // ── Range label ──
+  svg+='<rect x="'+axisX0+'" y="'+(AXIS_Y-NVA_H-26)+'" width="'+(axisX1-axisX0)+'" height="14" rx="3" fill="#1e3a5f" opacity=".6"/>';
+  svg+='<text x="'+(axisX0+(axisX1-axisX0)/2)+'" y="'+(AXIS_Y-NVA_H-15)+'" fill="#3b82f6" font-size="8" font-weight="700" text-anchor="middle">▶ '+h(steps[si].name)+' → '+h(steps[ei].name)+' ⏹</text>';
+
+  // ── TOTALS SUMMARY BAR ──
+  var touch2=slice.reduce(function(a,s){return a+effCT(s);},0);
+  var queue2=slice.reduce(function(a,s){return a+(+s.queueAfter||0);},0);
+  var total2=touch2+queue2;
+  var pct2=total2>0?(touch2/total2*100):0;
+  var barW=axisX1-axisX0;
+
+  svg+='<rect x="'+axisX0+'" y="'+TOT_Y+'" width="'+barW+'" height="44" rx="5" fill="#12151f" stroke="#2e3350" stroke-width="1.5"/>';
+  // VA fill proportion
+  var vaFillW=pct2/100*barW;
+  svg+='<rect x="'+axisX0+'" y="'+TOT_Y+'" width="'+vaFillW+'" height="44" rx="5" fill="#10b981" opacity=".2"/>';
+  // NVA fill
+  svg+='<rect x="'+(axisX0+vaFillW)+'" y="'+TOT_Y+'" width="'+(barW-vaFillW)+'" height="44" rx="5" fill="#ef4444" opacity=".1"/>';
+
+  // Row 1: VA stats
+  svg+='<rect x="'+(axisX0+8)+'" y="'+(TOT_Y+8)+'" width="12" height="12" rx="2" fill="#10b981" opacity=".8"/>';
+  svg+='<text x="'+(axisX0+26)+'" y="'+(TOT_Y+18)+'" fill="#10b981" font-size="9.5" font-weight="700">Process Time (VA): '+touch2.toFixed(1)+' hr</text>';  svg+='<rect x="'+(axisX0+barW/2+8)+'" y="'+(TOT_Y+8)+'" width="12" height="12" rx="2" fill="#ef4444" opacity=".7"/>';
+  svg+='<text x="'+(axisX0+barW/2+26)+'" y="'+(TOT_Y+18)+'" fill="#ef4444" font-size="9.5" font-weight="700">Lead Time (NVA): '+queue2.toFixed(1)+' hr</text>';
+  // Row 2: totals
+  svg+='<text x="'+(axisX0+26)+'" y="'+(TOT_Y+34)+'" fill="#64748b" font-size="9">Total: '+total2.toFixed(1)+'h = '+(total2/24).toFixed(1)+'d  |  %VA = '+pct2.toFixed(2)+'%  |  Throughput: '+(bn?((+bn.shifts||1)*8/drumRate(bn)).toFixed(1):'—')+' el/day  |  Bottleneck: '+(bn?h(bn.name):'—')+'</text>';
+
+  // ── LEGEND (bottom-left of timeline) ──
+  svg+='<rect x="'+(axisX0)+'" y="'+(TOT_Y+52)+'" width="260" height="20" rx="3" fill="#12151f" stroke="#2e3350" stroke-width="1" opacity=".8"/>';
+  svg+='<rect x="'+(axisX0+6)+'" y="'+(TOT_Y+57)+'" width="10" height="10" rx="2" fill="#10b981" opacity=".85"/>';
+  svg+='<text x="'+(axisX0+20)+'" y="'+(TOT_Y+66)+'" fill="#94a3b8" font-size="8">VA Process Time (below axis)</text>';
+  svg+='<rect x="'+(axisX0+136)+'" y="'+(TOT_Y+57)+'" width="10" height="10" rx="2" fill="#ef4444" opacity=".75"/>';
+  svg+='<text x="'+(axisX0+150)+'" y="'+(TOT_Y+66)+'" fill="#94a3b8" font-size="8">NVA Lead Time (above axis)</text>';
+
+  svg+='</svg>';
+  document.getElementById('vsm-container').innerHTML=svg;
+}
+
+// ─────────────────────────────────────────────────────────
+// ANALYSIS TAB
+// ─────────────────────────────────────────────────────────
+function renderAnalysis(){
+  var si=getStartIdx(), ei=getEndIdx(), takt=getTakt();
+  var slice=steps.slice(si,ei+1);
+  var res=analyse(slice);
+  var bn=res.bn;
+  var overTakt=res.dr>takt;
+
+  document.getElementById('analysis-header').textContent='Throughput & Throughput Time — '+steps[si].name+' → '+steps[ei].name;
+
+  var items=[
+    {l:'Queue / NVA Time',v:res.queue.toFixed(1)+' hr',s:'≈ '+(res.queue/24).toFixed(1)+' days',c:'var(--nva)'},
+    {l:'Total Throughput Time',v:res.total.toFixed(2)+' hr',s:'≈ '+(res.total/24).toFixed(1)+' days',c:'var(--accent)'},
+    {l:'% VA (Process Efficiency)',v:res.pct.toFixed(2)+'%',s:'Process Time ÷ '+res.total.toFixed(1)+'h total',c:'var(--a2)'},
+    {l:'Throughput ('+res.shiftH+'h/day)',v:res.tpd.toFixed(1)+' el/day',s:res.tph.toFixed(3)+' el/hr',c:'var(--a3)'},
+    {l:'Bottleneck',v:bn?bn.name:'—',s:bn?'Eff.C/T='+effCT(bn).toFixed(2)+'h | Drum='+drumRate(bn).toFixed(2)+'h/el':'',c:'var(--waste)'},
+    {l:'Takt Time',v:takt.toFixed(2)+' hr/el',s:'Site demand input',c:'var(--push)'},
+    {l:'Drum vs Takt',v:res.dr.toFixed(2)+' vs '+takt.toFixed(2)+' hr',s:overTakt?'⚠ OVER by '+(res.dr-takt).toFixed(2)+'h':'✓ Under by '+(takt-res.dr).toFixed(2)+'h',c:overTakt?'var(--waste)':'var(--a3)'},
+  ];
+  document.getElementById('analysis-kpis').innerHTML=items.map(function(k){
+    return '<div class="result-box"><div class="rlabel">'+k.l+'</div><div class="rbig" style="color:'+k.c+'">'+h(k.v)+'</div><div class="rsub">'+h(k.s)+'</div></div>';
+  }).join('');
+
+  // Step table
+  var totalEff=slice.reduce(function(a,s){return a+effCT(s);},0);
+  var totalQ=slice.reduce(function(a,s){return a+(+s.queueAfter||0);},0);
+  var totalT=totalEff+totalQ;
+  var th='<thead><tr>'+['#','Step','Type','Raw C/T','Avail','Eff. C/T','Machines','Drum Rate','Shifts','Workers','FPY','Queue After','% of Total'].map(function(h2){return '<th>'+h2+'</th>';}).join('')+'</tr></thead>';
+  var tbody='<tbody>';
+  slice.forEach(function(s,i){
+    var isBN=bn&&s.id===bn.id;
+    var eff=effCT(s), dr=drumRate(s);
+    var pct=totalT>0?(eff/totalT*100).toFixed(1):0;
+    tbody+='<tr style="background:'+(isBN?'#1a0808':'')+'">';
+    tbody+='<td style="color:'+(isBN?'var(--waste)':'var(--muted)')+';font-weight:'+(isBN?700:400)+'">'+(si+i+1)+'</td>';
+    tbody+='<td style="font-weight:600;color:'+(isBN?'var(--waste)':s.type==='VA'?'var(--va)':'var(--nva)')+'">'+h(s.name)+(isBN?'<span class="badge badge-BN">BN</span>':'')+(s.isQueue?' <span style="color:var(--push);font-size:10px;">QUEUE</span>':'')+'</td>';
+    tbody+='<td><span class="badge badge-'+(s.type==='VA'?'VA':'NVA')+'">'+s.type+'</span></td>';
+    tbody+='<td>'+(s.isQueue?s.ct+'h wait':s.ct+'h')+'</td>';
+    tbody+='<td>'+(s.isQueue?'—':s.avail+'%')+'</td>';
+    tbody+='<td style="color:var(--a2);font-weight:700;">'+eff.toFixed(2)+'h</td>';
+    tbody+='<td>'+(s.isQueue?'—':'×'+s.machines)+'</td>';
+    tbody+='<td style="color:'+(isBN?'var(--waste)':'var(--text)')+';font-weight:'+(isBN?700:400)+'">'+(s.isQueue?'—':dr.toFixed(2)+'h/el')+'</td>';
+    tbody+='<td>'+(s.isQueue?'—':s.shifts)+'</td>';
+    tbody+='<td>'+(s.isQueue?'—':s.workers)+'</td>';
+    tbody+='<td style="color:'+(s.fpy<90?'var(--waste)':'var(--text)')+'">'+(s.isQueue?'—':s.fpy+'%')+'</td>';
+    tbody+='<td style="color:'+(s.queueAfter>0?'var(--nva)':'var(--muted)')+'">'+( s.queueAfter>0?s.queueAfter+'h':'—')+'</td>';
+    tbody+='<td style="color:var(--muted)">'+pct+'%</td>';
+    tbody+='</tr>';
+  });
+  tbody+='<tr style="background:var(--surface2);font-weight:700;"><td colspan="5">TOTALS</td><td style="color:var(--a2)">'+totalEff.toFixed(2)+'h eff.</td><td colspan="4"></td><td style="color:var(--nva)">'+totalQ.toFixed(1)+'h queue</td><td colspan="2" style="color:var(--accent)">'+totalT.toFixed(2)+'h = '+(totalT/24).toFixed(1)+'d</td></tr>';
+  tbody+='</tbody>';
+  document.getElementById('analysis-table').innerHTML=th+tbody;
+
+  document.getElementById('oee-section').innerHTML='';
+}
+
+// ─────────────────────────────────────────────────────────
+// MULTI-ENDPOINT TAB
+// ─────────────────────────────────────────────────────────
+function renderMulti(){
+  var si=getStartIdx(), takt=getTakt();
+  document.getElementById('multi-header').textContent='Multi-Endpoint Analysis — Starting: '+(steps[si]?steps[si].name:'—');
+  document.getElementById('multi-sub').textContent='Each row shows results if that step is the end point. Takt = '+takt.toFixed(2)+' hr/el. Change Start Point in global controls to explore different windows.';
+  var th='<thead><tr>'+['End Point','Steps','Queue Time','Total (days)','% VA','Bottleneck','Drum Rate','Throughput/day','vs Takt'].map(function(hh){return '<th>'+hh+'</th>';}).join('')+'</tr></thead>';
+  var tbody='<tbody>';
+  for(var ei=si;ei<steps.length;ei++){
+    var slice2=steps.slice(si,ei+1);
+    var r=analyse(slice2);
+    var ot=r.dr>takt;
+    var isEnd=(ei===getEndIdx());
+    tbody+='<tr style="background:'+(isEnd?'#0d1f2a':ei%2===0?'var(--surface)':'')+'">';
+    tbody+='<td style="font-weight:600;color:var(--accent)">'+h(steps[ei].name)+(isEnd?' <span style="color:var(--a3);font-size:10px;">⏹</span>':'')+'</td>';
+    tbody+='<td style="color:var(--muted)">'+(ei-si+1)+'</td>';
+    tbody+='<td style="color:var(--nva)">'+r.queue.toFixed(1)+'h</td>';
+    tbody+='<td style="color:var(--accent);font-weight:700;">'+(r.total/24).toFixed(2)+'d</td>';
+    tbody+='<td style="color:var(--a2);font-weight:700;">'+r.pct.toFixed(2)+'%</td>';
+    tbody+='<td style="color:var(--waste);font-size:11px;">'+(r.bn?h(r.bn.name):'—')+'</td>';
+    tbody+='<td style="color:'+(ot?'var(--waste)':'var(--va)')+';font-weight:700;">'+(r.dr>0?r.dr.toFixed(2)+'h/el':'—')+'</td>';
+    tbody+='<td style="color:var(--a3);font-weight:700;">'+r.tpd.toFixed(1)+' el/d</td>';
+    tbody+='<td><span class="badge '+(ot?'badge-H':'badge-L')+'">'+(ot?'⚠ +'+( r.dr-takt).toFixed(2)+'h':'✓ −'+(takt-r.dr).toFixed(2)+'h')+'</span></td>';
+    tbody+='</tr>';
+  }
+  tbody+='</tbody>';
+  document.getElementById('multi-table').innerHTML=th+tbody;
+}
+
+// ─────────────────────────────────────────────────────────
+// 8 WASTES TAB
+// ─────────────────────────────────────────────────────────
+// STEP CRUD
+// ─────────────────────────────────────────────────────────
+function updateField(id, key, val){
+  steps.forEach(function(s){
+    if(s.id===id){
+      if(key==='isQueue') s[key]=(val==='Yes');
+      else if(key==='type') s[key]=val;
+      else if(key==='name'||key==='note') s[key]=val;
+      else s[key]=+val||0;
+    }
+  });
+  refresh();
+  // re-open the step that was just edited
+  var body=document.getElementById('body-'+id);
+  if(body&&!body.classList.contains('open')) body.classList.add('open');
+  var arr=document.getElementById('arr-'+id);
+  if(arr) arr.textContent='▲';
+}
+
+function addStep(pos){
+  var newS={id:nextId++,name:"New Step",ct:1,co:0,avail:80,shifts:1,workers:2,fpy:100,queueAfter:0,type:"VA",machines:1,isQueue:false,note:""};
+  steps.splice(pos,0,newS);
+  refresh();
+  showTab('editor');
+}
+
+function deleteStep(id){
+  if(steps.length<=1){alert('At least one step required.');return;}
+  if(!confirm('Delete this step?')) return;
+  steps=steps.filter(function(s){return s.id!==id;});
+  refresh();
+}
+
+function moveStep(idx,dir){
+  var ni=idx+dir;
+  if(ni<0||ni>=steps.length) return;
+  var tmp=steps[idx]; steps[idx]=steps[ni]; steps[ni]=tmp;
+  refresh();
+}
+
+function resetSteps(){
+  if(!confirm('Reset all steps to defaults?')) return;
+  steps=JSON.parse(JSON.stringify(defaultSteps));
+  document.getElementById('inp-takt').value='0.8';
+  document.getElementById('inp-demand').value='20';
+  document.getElementById('inp-shift').value='16';
+  refresh();
+}
+
+// ─────────────────────────────────────────────────────────
+// GLOBAL CONTROL LISTENERS
+// ─────────────────────────────────────────────────────────
+['sel-start','sel-end','inp-takt','inp-demand','inp-shift'].forEach(function(id){
+  document.getElementById(id).addEventListener('change', refresh);
+});
+
+// ─────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────
+refresh();
+</script>
+</body>
+</html>
