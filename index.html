@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IPS Precast — Interactive VSM</title>
+<title>IPS Precast — Interactive VSM v2</title>
 <style>
 :root{
   --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3350;
@@ -148,9 +148,9 @@ svg text{font-family:'Inter','Segoe UI',system-ui,sans-serif;}
 // ─────────────────────────────────────────────────────────
 var nextId = 100;
 var steps = [
-  {id:1,  name:"Build Pre-Cage",            ct:4,   co:1,   avail:85, shifts:2, workers:4, fpy:98,  queueAfter:12, type:"VA",  machines:1, isQueue:false, note:"Rebar cutting, bending & cage assembly — start point"},
+  {id:1,  name:"Build Pre-Cage",            ct:4,   co:1,   avail:85, shifts:2, workers:4, fpy:98,  queueAfter:12, type:"VA",  machines:8, isQueue:false, note:"Built ahead (offline) — parallel teams match mould count. Feeds 12h buffer before installation."},
   {id:2,  name:"Install Pre-Cage to Mould", ct:1,   co:0.5, avail:85, shifts:2, workers:3, fpy:99,  queueAfter:0,  type:"VA",  machines:1, isQueue:false, note:"Pre-cage lowered, positioned and tied in mould"},
-  {id:3,  name:"Install M&E on Pre-Cage",   ct:2,   co:0.5, avail:85, shifts:2, workers:3, fpy:97,  queueAfter:0,  type:"VA",  machines:1, isQueue:false, note:"M&E conduit, boxes and sleeves installed on cage"},
+  {id:3,  name:"Install M&E on Pre-Cage",   ct:2,   co:0.5, avail:85, shifts:2, workers:3, fpy:97,  queueAfter:0,  type:"VA",  machines:1, isQueue:false, note:"M&E conduit, boxes and sleeves installed on pre-cage — customer-required transformation"},
   {id:4,  name:"Pre-Pour QC Inspection",    ct:0.5, co:0,   avail:85, shifts:1, workers:1, fpy:100, queueAfter:0,  type:"NVA", machines:1, isQueue:false, note:"Gate QC — mould, cage, M&E sign-off"},
   {id:5,  name:"Closing & Casting",         ct:5,   co:2,   avail:85, shifts:2, workers:7, fpy:85,  queueAfter:0,  type:"VA",  machines:8, isQueue:false, note:"Mould close, concrete pour, vibration. x8 moulds"},
   {id:6,  name:"Curing / Cooling",          ct:24,  co:0,   avail:100,shifts:3, workers:0, fpy:100, queueAfter:24, type:"NVA", machines:1, isQueue:true,  note:"Fixed wait — concrete hydration. No IoT sensing."},
@@ -291,7 +291,9 @@ function renderStepList(){
     html+='<span style="font-size:11px;color:'+bCol+';">'+(s.isQueue?'⏳':'⚙')+'</span>';
     html+='<span style="flex:1;font-weight:600;font-size:12px;">'+h(s.name)+'</span>';
     if(isBN) html+='<span class="badge badge-BN">BN</span>';
-    html+='<span style="font-size:10px;color:var(--muted);">'+(s.isQueue?'Wait '+s.ct+'h':'C/T '+s.ct+'h → Eff '+eff+'h')+'</span>';
+    // VA/NVA pill — always visible in header
+    if(!s.isQueue) html+='<span style="font-size:9px;font-weight:800;padding:2px 7px;border-radius:3px;background:'+(s.type==='VA'?'#052e16':'#1e1b4b')+';color:'+(s.type==='VA'?'#10b981':'#818cf8')+';">'+s.type+'</span>';
+    html+='<span style="font-size:10px;color:var(--muted);margin-left:4px;">'+(s.isQueue?'Wait '+s.ct+'h':'C/T '+s.ct+'h → Eff '+eff+'h')+'</span>';
     html+='<span style="color:var(--muted);font-size:11px;margin-left:6px;" id="arr-'+s.id+'">▼</span>';
     html+='</div>';
     // body
@@ -512,10 +514,10 @@ function renderVSM(){
     // Dim steps outside selected range
     var dimOpacity=inRange?1:0.3;
 
-    var fillCol=isBN?'#2a1515':s.isQueue?'#1a1a2a':s.type==='VA'?'#1a1f2e':'#0d1f17';
-    var strokeCol=isBN?'#ef4444':s.isQueue?'#6366f1':inRange?(s.type==='VA'?'#334155':'#10b981'):'#2e3350';
-    var strokeW=isBN?2.5:1.8;
-    var textCol=isBN?'#ef4444':s.isQueue?'#a5b4fc':s.type==='VA'?'#e2e8f0':'#10b981';
+    var fillCol=isBN?'#2a1515':s.isQueue?'#1a1a2a':s.type==='VA'?'#0d1f17':'#1a1d27';
+    var strokeCol=isBN?'#ef4444':s.isQueue?'#6366f1':inRange?(s.type==='VA'?'#10b981':'#475569'):'#2e3350';
+    var strokeW=isBN?2.5:s.type==='VA'&&inRange?2:1.5;
+    var textCol=isBN?'#ef4444':s.isQueue?'#a5b4fc':s.type==='VA'?'#10b981':'#94a3b8';
 
     // Dim wrapper
     svg+='<g opacity="'+dimOpacity+'">';
@@ -541,7 +543,8 @@ function renderVSM(){
     lines=lines.slice(0,3);
     var nameY=PROC_Y+(lines.length===1?28:lines.length===2?22:16);
     lines.forEach(function(ln,j){
-      svg+='<text x="'+(x+BOX_W/2)+'" y="'+(nameY+j*13)+'" fill="'+textCol+'" font-size="9.5" font-weight="700" text-anchor="middle">'+h(ln)+'</text>';
+      var nameTextCol=isBN?'#ef4444':s.isQueue?'#a5b4fc':s.type==='VA'?'#e2e8f0':'#94a3b8';
+      svg+='<text x="'+(x+BOX_W/2)+'" y="'+(nameY+j*13)+'" fill="'+nameTextCol+'" font-size="9.5" font-weight="700" text-anchor="middle">'+h(ln)+'</text>';
     });
 
     // Bottleneck label
@@ -603,10 +606,17 @@ function renderVSM(){
       svg+='<use href="#kz" x="'+(x+BOX_W-6)+'" y="'+(PROC_Y-20)+'" width="36" height="36"/>';
     }
 
-    // QC gate badge
-    if(s.type==='NVA'&&!s.isQueue){
+    // QC badge — only on inspection steps (name contains 'Inspection' or 'QC')
+    var isInspection=s.type==='NVA'&&!s.isQueue&&(s.name.toLowerCase().indexOf('inspection')>=0||s.name.toLowerCase().indexOf('qc')>=0);
+    if(isInspection){
       svg+='<rect x="'+(x+BOX_W/2-16)+'" y="'+(PROC_Y-12)+'" width="32" height="12" rx="3" fill="#052e16" stroke="#10b981" stroke-width=".8"/>';
       svg+='<text x="'+(x+BOX_W/2)+'" y="'+(PROC_Y-3)+'" fill="#10b981" font-size="7.5" text-anchor="middle" font-weight="700">QC</text>';
+    }
+
+    // VA badge on value-adding steps
+    if(s.type==='VA'&&!s.isQueue&&!isBN){
+      svg+='<rect x="'+(x+4)+'" y="'+(PROC_Y+3)+'" width="22" height="11" rx="2" fill="#052e16" stroke="#10b981" stroke-width=".8"/>';
+      svg+='<text x="'+(x+15)+'" y="'+(PROC_Y+11)+'" fill="#10b981" font-size="7" font-weight="800" text-anchor="middle">VA</text>';
     }
 
     svg+='</g>';
