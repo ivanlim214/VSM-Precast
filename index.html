@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IPS Precast — Interactive VSM v2</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root{
   --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3350;
@@ -106,6 +107,20 @@ svg text{font-family:'Inter','Segoe UI',system-ui,sans-serif;}
 
 <!-- PANES -->
 <div id="pane-editor" class="pane active">
+  <!-- Import/Export toolbar -->
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;flex-wrap:wrap;">
+    <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;">Step Data</span>
+    <button onclick="exportToExcel()" style="background:#16a34a;color:#fff;display:flex;align-items:center;gap:6px;">
+      <span>⬇</span> Export to Excel
+    </button>
+    <label style="margin:0;cursor:pointer;">
+      <span style="display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;padding:6px 12px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">
+        <span>⬆</span> Import from Excel
+      </span>
+      <input type="file" id="file-import" accept=".xlsx,.xls,.csv" style="display:none;" onchange="importFromExcel(event)"/>
+    </label>
+    <span style="color:var(--muted);font-size:11px;">Export includes all step parameters · Import updates steps from Excel</span>
+  </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
     <div>
       <div class="sec-title">Process Steps — click to expand &amp; edit</div>
@@ -122,12 +137,18 @@ svg text{font-family:'Inter','Segoe UI',system-ui,sans-serif;}
 </div>
 
 <div id="pane-vsm" class="pane">
-  <div class="sec-title">Standard VSM Diagram — Full Process Flow</div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+    <div class="sec-title" style="margin:0;border:none;padding:0;flex:1;">Standard VSM Diagram — Full Process Flow</div>
+    <button onclick="exportVSMasSVG()" style="background:#7c3aed;color:#fff;display:flex;align-items:center;gap:6px;">⬇ Export SVG</button>
+  </div>
   <div class="vsm-scroll" id="vsm-container"></div>
 </div>
 
 <div id="pane-analysis" class="pane">
-  <div id="analysis-header" class="sec-title"></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
+    <div id="analysis-header" class="sec-title" style="margin:0;border:none;padding:0;flex:1;"></div>
+    <button onclick="exportAnalysisToExcel()" style="background:#16a34a;color:#fff;display:flex;align-items:center;gap:6px;">⬇ Export Analysis to Excel</button>
+  </div>
   <div id="analysis-kpis" class="analysis-grid"></div>
   <div class="sec-title" style="margin-top:4px;">Step-by-Step Effective C/T Breakdown</div>
   <div style="overflow-x:auto;"><table id="analysis-table"></table></div>
@@ -135,7 +156,10 @@ svg text{font-family:'Inter','Segoe UI',system-ui,sans-serif;}
 </div>
 
 <div id="pane-multiend" class="pane">
-  <div id="multi-header" class="sec-title"></div>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+    <div id="multi-header" class="sec-title" style="margin:0;border:none;padding:0;flex:1;"></div>
+    <button onclick="exportMultiToExcel()" style="background:#16a34a;color:#fff;display:flex;align-items:center;gap:6px;">⬇ Export to Excel</button>
+  </div>
   <div style="color:var(--muted);font-size:12px;margin-bottom:14px;" id="multi-sub"></div>
   <div style="overflow-x:auto;"><table id="multi-table"></table></div>
 </div>
@@ -997,7 +1021,241 @@ function resetSteps(){
 });
 
 // ─────────────────────────────────────────────────────────
-// INIT
+// EXCEL EXPORT — Step Parameters
+// ─────────────────────────────────────────────────────────
+function exportToExcel(){
+  var takt=getTakt(), si=getStartIdx(), ei=getEndIdx();
+  var wb=XLSX.utils.book_new();
+
+  // ── Sheet 1: Step Parameters ──
+  var paramRows=[['IPS Precast — VSM Step Parameters'],
+    ['Generated:',new Date().toLocaleString()],[''],
+    ['#','Step Name','Type','Is Queue','C/T (hr)','C/O (hr)','Availability %','Shifts','Workers','Machines','FPY %','Queue After (hr)','Eff. C/T (hr)','Drum Rate (hr/el)','Note']
+  ];
+  steps.forEach(function(s,i){
+    paramRows.push([
+      i+1, s.name, s.type, s.isQueue?'Yes':'No',
+      +s.ct, +s.co, +s.avail, +s.shifts, +s.workers, +s.machines, +s.fpy, +s.queueAfter,
+      parseFloat(effCT(s).toFixed(3)), parseFloat(drumRate(s).toFixed(3)), s.note||''
+    ]);
+  });
+  var ws1=XLSX.utils.aoa_to_sheet(paramRows);
+  ws1['!cols']=[{wch:4},{wch:28},{wch:8},{wch:10},{wch:10},{wch:10},{wch:14},{wch:8},{wch:9},{wch:10},{wch:8},{wch:14},{wch:12},{wch:16},{wch:40}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Step Parameters');
+
+  // ── Sheet 2: Throughput Analysis (selected range) ──
+  var slice=steps.slice(si,ei+1);
+  var res=analyse(slice);
+  var bn=res.bn;
+  var anaRows=[['IPS Precast — Throughput Analysis'],
+    ['Range:',steps[si].name+' → '+steps[ei].name],
+    ['Generated:',new Date().toLocaleString()],[''],
+    ['SUMMARY',''],
+    ['Total Lead Time (hr)', parseFloat(res.total.toFixed(2))],
+    ['NVA / Queue Time (hr)', parseFloat(res.queue.toFixed(1))],
+    ['Process Efficiency %VA', parseFloat(res.pct.toFixed(2))],
+    ['Throughput (el/day)', parseFloat(res.tpd.toFixed(2))],
+    ['Bottleneck Step', bn?bn.name:'—'],
+    ['Bottleneck Drum Rate (hr/el)', bn?parseFloat(drumRate(bn).toFixed(3)):'-'],
+    ['Takt Time (hr/el)', takt],
+    ['Drum vs Takt', bn?(drumRate(bn)>takt?'OVER by '+(drumRate(bn)-takt).toFixed(3)+'h':'Under by '+(takt-drumRate(bn)).toFixed(3)+'h'):'—'],
+    [''],
+    ['STEP BREAKDOWN','','','','','','','',''],
+    ['#','Step','Type','Raw C/T','Avail %','Eff. C/T','Machines','Drum Rate','Shifts','Workers','FPY %','Queue After','% of Total']
+  ];
+  var totalT=res.total||1;
+  slice.forEach(function(s,i){
+    var eff=effCT(s), dr=drumRate(s);
+    anaRows.push([
+      si+i+1, s.name, s.type, +s.ct, +s.avail,
+      parseFloat(eff.toFixed(3)), +s.machines, parseFloat(dr.toFixed(3)),
+      +s.shifts, +s.workers, +s.fpy, +s.queueAfter,
+      parseFloat((eff/totalT*100).toFixed(2))
+    ]);
+  });
+  var ws2=XLSX.utils.aoa_to_sheet(anaRows);
+  ws2['!cols']=[{wch:4},{wch:28},{wch:8},{wch:10},{wch:8},{wch:12},{wch:10},{wch:14},{wch:8},{wch:9},{wch:8},{wch:14},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Throughput Analysis');
+
+  // ── Sheet 3: Multi-Endpoint ──
+  var meRows=[['IPS Precast — Multi-Endpoint Analysis'],
+    ['Start Point:', steps[si].name],
+    ['Takt Time (hr/el):', takt],
+    ['Generated:', new Date().toLocaleString()],[''],
+    ['End Point','Steps','Queue Time (hr)','Total Time (days)','% VA','Bottleneck','Drum Rate (hr/el)','Throughput (el/day)','vs Takt']
+  ];
+  for(var mei=si;mei<steps.length;mei++){
+    var r=analyse(steps.slice(si,mei+1));
+    var ot=r.dr>takt;
+    meRows.push([
+      steps[mei].name, mei-si+1,
+      parseFloat(r.queue.toFixed(1)),
+      parseFloat((r.total/24).toFixed(2)),
+      parseFloat(r.pct.toFixed(2)),
+      r.bn?r.bn.name:'—',
+      r.dr>0?parseFloat(r.dr.toFixed(3)):'-',
+      parseFloat(r.tpd.toFixed(2)),
+      ot?'OVER by '+(r.dr-takt).toFixed(3)+'h':'Under by '+(takt-r.dr).toFixed(3)+'h'
+    ]);
+  }
+  var ws3=XLSX.utils.aoa_to_sheet(meRows);
+  ws3['!cols']=[{wch:28},{wch:8},{wch:16},{wch:16},{wch:10},{wch:28},{wch:16},{wch:16},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,ws3,'Multi-Endpoint');
+
+  // ── Sheet 4: Dashboard Summary ──
+  var dashRows=[['IPS PRECAST — VSM DASHBOARD SUMMARY'],
+    ['Generated:', new Date().toLocaleString()],
+    ['Total Steps:', steps.length],
+    ['Analysis Range:', steps[si].name+' → '+steps[ei].name],[''],
+    ['KEY METRICS','Value','Unit'],
+    ['Total Lead Time', parseFloat(res.total.toFixed(2)), 'hr'],
+    ['Total Lead Time', parseFloat((res.total/24).toFixed(2)), 'days'],
+    ['NVA / Queue Time', parseFloat(res.queue.toFixed(1)), 'hr'],
+    ['Process Efficiency', parseFloat(res.pct.toFixed(2)), '%'],
+    ['Throughput', parseFloat(res.tpd.toFixed(2)), 'el/day'],
+    ['Takt Time', takt, 'hr/el'],
+    ['Bottleneck', bn?bn.name:'—', ''],
+    ['Drum Rate', bn?parseFloat(drumRate(bn).toFixed(3)):'-', 'hr/el'],
+    ['Takt Status', bn?(drumRate(bn)>takt?'⚠ OVER TAKT':'✓ WITHIN TAKT'):'—', ''],[''],
+    ['VA STEPS','Count',steps.filter(function(s){return s.type==='VA'&&!s.isQueue;}).length],
+    ['NVA STEPS','Count',steps.filter(function(s){return s.type==='NVA'&&!s.isQueue;}).length],
+    ['QUEUE STEPS','Count',steps.filter(function(s){return s.isQueue;}).length],
+  ];
+  var ws4=XLSX.utils.aoa_to_sheet(dashRows);
+  ws4['!cols']=[{wch:30},{wch:20},{wch:15}];
+  XLSX.utils.book_append_sheet(wb,ws4,'Dashboard');
+
+  XLSX.writeFile(wb,'IPS_Precast_VSM_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+// ─────────────────────────────────────────────────────────
+// EXCEL IMPORT — Step Parameters
+// ─────────────────────────────────────────────────────────
+function importFromExcel(evt){
+  var file=evt.target.files[0];
+  if(!file) return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(e.target.result,{type:'binary'});
+      var ws=wb.Sheets[wb.SheetNames[0]];
+      var rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      // Find header row (has 'Step Name' or 'step name')
+      var hdrIdx=-1;
+      rows.forEach(function(r,i){
+        if(r.some(function(c){return String(c).toLowerCase().indexOf('step name')>=0;})) hdrIdx=i;
+      });
+      if(hdrIdx<0){alert('Cannot find header row with "Step Name" column. Please use a VSM export file.');return;}
+      var hdr=rows[hdrIdx].map(function(c){return String(c).toLowerCase().trim();});
+      var col=function(name){return hdr.indexOf(name);};
+      var newSteps=[];
+      for(var ri=hdrIdx+1;ri<rows.length;ri++){
+        var row=rows[ri];
+        if(!row[col('step name')]&&!row[1]) continue;
+        var nameVal=row[col('step name')]||row[1];
+        if(!nameVal||String(nameVal).trim()==='') continue;
+        var s={
+          id: nextId++,
+          name: String(nameVal).trim(),
+          type: String(row[col('type')]||'VA').trim().toUpperCase()==='VA'?'VA':'NVA',
+          isQueue: String(row[col('is queue')]||'No').trim().toLowerCase()==='yes',
+          ct: parseFloat(row[col('c/t (hr)')]||row[col('ct (hr)')]||0)||0,
+          co: parseFloat(row[col('c/o (hr)')]||row[col('co (hr)')]||0)||0,
+          avail: parseFloat(row[col('availability %')]||row[col('avail %')]||85)||85,
+          shifts: parseFloat(row[col('shifts')]||1)||1,
+          workers: parseFloat(row[col('workers')]||1)||1,
+          machines: parseFloat(row[col('machines')]||1)||1,
+          fpy: parseFloat(row[col('fpy %')]||100)||100,
+          queueAfter: parseFloat(row[col('queue after (hr)')]||0)||0,
+          note: String(row[col('note')]||'').trim()
+        };
+        newSteps.push(s);
+      }
+      if(newSteps.length===0){alert('No valid step rows found. Check the file format.');return;}
+      if(!confirm('Import '+newSteps.length+' steps from Excel? This will replace the current steps.')) return;
+      steps=newSteps;
+      refresh();
+      alert('✅ Imported '+newSteps.length+' steps successfully.');
+    }catch(err){
+      alert('Import error: '+err.message);
+    }
+    evt.target.value='';
+  };
+  reader.readAsBinaryString(file);
+}
+
+// ─────────────────────────────────────────────────────────
+// EXCEL EXPORT — Analysis tab only
+// ─────────────────────────────────────────────────────────
+function exportAnalysisToExcel(){
+  var takt=getTakt(), si=getStartIdx(), ei=getEndIdx();
+  var slice=steps.slice(si,ei+1);
+  var res=analyse(slice);
+  var bn=res.bn;
+  var wb=XLSX.utils.book_new();
+  var totalT=res.total||1;
+  var rows=[['IPS Precast — Throughput Analysis'],
+    ['Range:', steps[si].name+' → '+steps[ei].name],
+    ['Generated:', new Date().toLocaleString()],[''],
+    ['SUMMARY'],
+    ['Total Lead Time (hr)', parseFloat(res.total.toFixed(2))],
+    ['NVA Queue Time (hr)', parseFloat(res.queue.toFixed(1))],
+    ['%VA', parseFloat(res.pct.toFixed(2))],
+    ['Throughput (el/day)', parseFloat(res.tpd.toFixed(2))],
+    ['Bottleneck', bn?bn.name:'—'],
+    ['Drum Rate (hr/el)', bn?parseFloat(drumRate(bn).toFixed(3)):'-'],
+    ['Takt (hr/el)', takt],
+    ['Takt Status', bn?(drumRate(bn)>takt?'⚠ OVER':'✓ OK'):'—'],[''],
+    ['#','Step','Type','C/T','Avail%','Eff.C/T','Machines','Drum Rate','Shifts','Workers','FPY%','Queue After','% of Total']
+  ];
+  slice.forEach(function(s,i){
+    rows.push([si+i+1,s.name,s.type,+s.ct,+s.avail,parseFloat(effCT(s).toFixed(3)),+s.machines,parseFloat(drumRate(s).toFixed(3)),+s.shifts,+s.workers,+s.fpy,+s.queueAfter,parseFloat((effCT(s)/totalT*100).toFixed(2))]);
+  });
+  var ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:4},{wch:28},{wch:8},{wch:8},{wch:8},{wch:12},{wch:10},{wch:14},{wch:8},{wch:9},{wch:8},{wch:14},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws,'Analysis');
+  XLSX.writeFile(wb,'VSM_Analysis_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+// ─────────────────────────────────────────────────────────
+// EXCEL EXPORT — Multi-Endpoint tab only
+// ─────────────────────────────────────────────────────────
+function exportMultiToExcel(){
+  var takt=getTakt(), si=getStartIdx();
+  var wb=XLSX.utils.book_new();
+  var rows=[['IPS Precast — Multi-Endpoint Analysis'],
+    ['Start:', steps[si].name],['Takt (hr/el):', takt],[''],
+    ['End Point','Steps','Queue Time (hr)','Total (days)','%VA','Bottleneck','Drum Rate','Throughput/day','vs Takt']
+  ];
+  for(var mei=si;mei<steps.length;mei++){
+    var r=analyse(steps.slice(si,mei+1));
+    var ot=r.dr>takt;
+    rows.push([steps[mei].name,mei-si+1,parseFloat(r.queue.toFixed(1)),parseFloat((r.total/24).toFixed(2)),parseFloat(r.pct.toFixed(2)),r.bn?r.bn.name:'—',r.dr>0?parseFloat(r.dr.toFixed(3)):'-',parseFloat(r.tpd.toFixed(2)),ot?'OVER +'+( r.dr-takt).toFixed(3):'OK -'+(takt-r.dr).toFixed(3)]);
+  }
+  var ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:28},{wch:8},{wch:16},{wch:14},{wch:10},{wch:28},{wch:14},{wch:16},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,ws,'Multi-Endpoint');
+  XLSX.writeFile(wb,'VSM_MultiEndpoint_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+// ─────────────────────────────────────────────────────────
+// SVG EXPORT — VSM Diagram
+// ─────────────────────────────────────────────────────────
+function exportVSMasSVG(){
+  var container=document.getElementById('vsm-container');
+  var svg=container.querySelector('svg');
+  if(!svg){alert('Please open the VSM Diagram tab first to generate the diagram.');return;}
+  // Add XML declaration and namespace
+  var svgData='<?xml version="1.0" encoding="UTF-8"?>'+svg.outerHTML;
+  var blob=new Blob([svgData],{type:'image/svg+xml;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  a.href=url; a.download='IPS_Precast_VSM_'+new Date().toISOString().slice(0,10)+'.svg';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────
 refresh();
 </script>
